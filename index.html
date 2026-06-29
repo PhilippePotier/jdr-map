@@ -1,0 +1,648 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="JDR Map">
+  <meta name="theme-color" content="#f5f3ec">
+  <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" href="icon-512.png">
+  <title>JDR Map</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f3ec; height: 100dvh; overflow: hidden; display: flex; flex-direction: column; }
+
+    /* ── TOP BAR ── */
+    #topbar {
+      display: flex; align-items: center; gap: 8px;
+      padding: 8px 12px; background: #faf8f3;
+      border-bottom: 1px solid #dddad0; flex-shrink: 0;
+      height: 52px;
+    }
+    #topbar button.icon-btn {
+      background: none; border: none; cursor: pointer;
+      font-size: 20px; padding: 4px 8px; border-radius: 8px;
+      color: #2c2c2a;
+    }
+    #topbar button.icon-btn:active { background: #e8e5dc; }
+    #campaign-select {
+      font-size: 14px; font-weight: 600; border: 1px solid #dddad0;
+      border-radius: 8px; padding: 4px 8px; background: white;
+      color: #2c2c2a; flex: 1; max-width: 180px;
+    }
+    #topbar .pos-info { font-size: 12px; color: #888780; margin-left: auto; }
+
+    /* ── MAIN LAYOUT ── */
+    #main { display: flex; flex: 1; overflow: hidden; }
+
+    /* ── SIDEBAR ── */
+    #sidebar {
+      width: 280px; flex-shrink: 0; background: #faf8f3;
+      border-right: 1px solid #dddad0; overflow-y: auto;
+      transition: transform 0.3s ease; padding: 12px;
+      display: flex; flex-direction: column; gap: 12px;
+    }
+    #sidebar.hidden { transform: translateX(-100%); position: absolute; height: calc(100% - 52px); z-index: 10; box-shadow: 4px 0 20px rgba(0,0,0,0.15); }
+    .section-title { font-size: 11px; font-weight: 700; color: #888780; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; }
+    .section { display: flex; flex-direction: column; gap: 6px; }
+    .btn { border: none; border-radius: 8px; padding: 8px 14px; font-size: 13px; font-weight: 600; cursor: pointer; }
+    .btn:active { opacity: 0.7; }
+    .btn-blue { background: #e6f1fb; color: #185fa5; }
+    .btn-red { background: #fbeaea; color: #a32d2d; }
+    .btn-orange { background: #fef3e2; color: #a05a00; }
+    .btn-green { background: #eaf4ea; color: #2d6e2d; }
+    .btn-row { display: flex; gap: 8px; }
+    label.field-label { font-size: 12px; font-weight: 600; color: #2c2c2a; }
+    input.field, textarea.field {
+      border: 1px solid #dddad0; border-radius: 8px;
+      padding: 6px 8px; font-size: 13px; background: white;
+      color: #2c2c2a; font-family: inherit; width: 100%;
+      resize: none;
+    }
+    input.field:focus, textarea.field:focus { outline: none; border-color: #185fa5; }
+    .stat-row { display: flex; align-items: center; gap: 8px; }
+    .stat-row label { font-size: 12px; font-weight: 600; width: 90px; flex-shrink: 0; color: #2c2c2a; }
+    .stat-row input { flex: 1; }
+    .dice-result { font-size: 36px; color: #d85a30; text-align: center; line-height: 1; min-height: 40px; }
+    .two-dice-result { font-size: 20px; font-weight: 700; color: #d85a30; min-height: 28px; }
+    hr { border: none; border-top: 1px solid #dddad0; }
+
+    /* ── MAP ── */
+    #map-container { flex: 1; overflow: auto; position: relative; }
+    #map-canvas { display: block; touch-action: none; }
+
+    /* ── LABEL MODAL ── */
+    #label-modal {
+      display: none; position: fixed; inset: 0; z-index: 100;
+      background: rgba(0,0,0,0.4); align-items: center; justify-content: center;
+    }
+    #label-modal.visible { display: flex; }
+    #label-modal .modal-box {
+      background: white; border-radius: 16px; padding: 24px;
+      width: 320px; max-width: 90vw;
+    }
+    #label-modal h3 { font-size: 16px; margin-bottom: 16px; }
+    #label-modal input { width: 100%; font-size: 15px; padding: 10px 12px; border: 1px solid #dddad0; border-radius: 8px; margin-bottom: 12px; }
+    #label-modal .modal-btns { display: flex; gap: 8px; justify-content: flex-end; }
+    #label-modal .modal-btns button { padding: 8px 18px; border-radius: 8px; border: none; font-size: 14px; font-weight: 600; cursor: pointer; }
+    #label-modal .btn-cancel { background: #f0ede4; color: #2c2c2a; }
+    #label-modal .btn-ok { background: #185fa5; color: white; }
+    #label-modal .btn-delete { background: #fbeaea; color: #a32d2d; }
+
+    /* ── NEW CAMPAIGN MODAL ── */
+    #camp-modal {
+      display: none; position: fixed; inset: 0; z-index: 100;
+      background: rgba(0,0,0,0.4); align-items: center; justify-content: center;
+    }
+    #camp-modal.visible { display: flex; }
+    #camp-modal .modal-box { background: white; border-radius: 16px; padding: 24px; width: 300px; }
+    #camp-modal h3 { font-size: 16px; margin-bottom: 16px; }
+    #camp-modal input { width: 100%; font-size: 15px; padding: 10px 12px; border: 1px solid #dddad0; border-radius: 8px; margin-bottom: 12px; }
+    #camp-modal .modal-btns { display: flex; gap: 8px; justify-content: flex-end; }
+    #camp-modal .modal-btns button { padding: 8px 18px; border-radius: 8px; border: none; font-size: 14px; font-weight: 600; cursor: pointer; }
+  </style>
+</head>
+<body>
+
+<!-- TOP BAR -->
+<div id="topbar">
+  <button class="icon-btn" id="sidebar-toggle" title="Menu">☰</button>
+  <select id="campaign-select"></select>
+  <button class="btn btn-green" id="new-camp-btn" style="padding:4px 10px;font-size:12px;">+ Nouvelle</button>
+  <button class="btn btn-red" id="del-camp-btn" style="padding:4px 10px;font-size:12px;">✕</button>
+  <span class="pos-info" id="pos-info"></span>
+</div>
+
+<!-- MAIN -->
+<div id="main">
+
+  <!-- SIDEBAR -->
+  <div id="sidebar">
+
+    <!-- Navigation -->
+    <div class="section">
+      <div class="section-title">🧭 Navigation</div>
+      <div class="btn-row">
+        <button class="btn btn-blue" id="undo-btn" style="flex:1">↩ Annuler</button>
+        <button class="btn btn-red" id="reset-btn" style="flex:1">✕ Reset</button>
+      </div>
+    </div>
+
+    <hr>
+
+    <!-- Dé -->
+    <div class="section">
+      <div class="section-title">🎲 Dé</div>
+      <button class="btn btn-orange" id="dice1-btn">🎲 Lancer 1 dé</button>
+      <div class="dice-result" id="dice1-result"></div>
+    </div>
+
+    <hr>
+
+    <!-- Chapitre -->
+    <div class="section">
+      <div class="section-title">📖 Dernier chapitre</div>
+      <textarea class="field" id="chapter" rows="3" placeholder="Numéro ou résumé du chapitre..."></textarea>
+    </div>
+
+    <hr>
+
+    <!-- Stats -->
+    <div class="section">
+      <div class="section-title">⚡ Statistiques</div>
+      <div class="stat-row"><label>Habilité</label><input class="field" id="habilite" type="text"></div>
+      <div class="stat-row"><label>Endurance</label><input class="field" id="endurance" type="text"></div>
+      <div class="stat-row"><label>Chance</label><input class="field" id="chance" type="text"></div>
+      <div class="stat-row"><label>Or</label><input class="field" id="or" type="text"></div>
+      <label class="field-label">Équipement</label>
+      <textarea class="field" id="equipement" rows="3"></textarea>
+      <label class="field-label">Trésor</label>
+      <textarea class="field" id="tresor" rows="3"></textarea>
+      <label class="field-label">Provisions</label>
+      <textarea class="field" id="provisions" rows="3"></textarea>
+    </div>
+
+    <hr>
+
+    <!-- Combat -->
+    <div class="section">
+      <div class="section-title">⚔️ Combat</div>
+      <label class="field-label">Endurance ennemi</label>
+      <textarea class="field" id="enemy-endurance" rows="2"></textarea>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-top:6px;">
+        <label class="field-label">Habileté ennemi</label>
+        <button class="btn btn-orange" id="dice2-btn" style="padding:4px 10px;font-size:12px;">🎲🎲 2 dés</button>
+      </div>
+      <div class="two-dice-result" id="dice2-result"></div>
+      <textarea class="field" id="enemy-habilite" rows="2"></textarea>
+    </div>
+
+  </div>
+
+  <!-- MAP -->
+  <div id="map-container">
+    <canvas id="map-canvas"></canvas>
+  </div>
+
+</div>
+
+<!-- LABEL MODAL -->
+<div id="label-modal">
+  <div class="modal-box">
+    <h3 id="label-modal-title">Nommer la case</h3>
+    <input type="text" id="label-input" placeholder="Ex: Village, Donjon, Forêt...">
+    <div class="modal-btns">
+      <button class="btn-delete" id="label-delete-btn">Effacer</button>
+      <button class="btn-cancel" id="label-cancel-btn">Annuler</button>
+      <button class="btn-ok" id="label-ok-btn">Valider</button>
+    </div>
+  </div>
+</div>
+
+<!-- NEW CAMPAIGN MODAL -->
+<div id="camp-modal">
+  <div class="modal-box">
+    <h3>Nouvelle campagne</h3>
+    <input type="text" id="camp-name-input" placeholder="Nom de la campagne...">
+    <div class="modal-btns">
+      <button class="btn-cancel" id="camp-cancel-btn" style="background:#f0ede4;color:#2c2c2a;">Annuler</button>
+      <button class="btn-ok" id="camp-ok-btn" style="background:#185fa5;color:white;">Créer</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── CONFIG ──
+const CELL = 52;
+const COLS = 21;
+const ROWS = 21;
+const CX = Math.floor(COLS / 2);
+const CY = Math.floor(ROWS / 2);
+const DICE_FACES = ['⚀','⚁','⚂','⚃','⚄','⚅'];
+
+// ── STATE ──
+let currentCampaign = 'Défaut';
+let campaigns = {};
+let pos = {x: CX, y: CY};
+let path = [{x: CX, y: CY}];
+let history = [];
+let cellLabels = {};
+let sidebarVisible = true;
+
+// Fields
+const FIELDS = ['chapter','habilite','endurance','chance','or','equipement','tresor','provisions','enemy-endurance','enemy-habilite'];
+
+// ── CANVAS ──
+const canvas = document.getElementById('map-canvas');
+const ctx = canvas.getContext('2d');
+
+function resizeCanvas() {
+  const container = document.getElementById('map-container');
+  const w = Math.max(COLS * CELL + 40, container.clientWidth);
+  const h = Math.max(ROWS * CELL + 40, container.clientHeight);
+  canvas.width = w;
+  canvas.height = h;
+  draw();
+}
+
+function cellRect(x, y) {
+  return { x: x * CELL, y: y * CELL, w: CELL, h: CELL };
+}
+function cellCenter(x, y) {
+  return { x: x * CELL + CELL / 2, y: y * CELL + CELL / 2 };
+}
+
+function draw() {
+  const W = canvas.width, H = canvas.height;
+  ctx.clearRect(0, 0, W, H);
+
+  // Background
+  ctx.fillStyle = '#f5f3ec';
+  ctx.fillRect(0, 0, W, H);
+
+  // Visited cells
+  const visited = new Set(path.map(p => `${p.x},${p.y}`));
+  visited.forEach(key => {
+    const [x, y] = key.split(',').map(Number);
+    ctx.fillStyle = '#b5d4f4';
+    ctx.fillRect(x * CELL + 1, y * CELL + 1, CELL - 2, CELL - 2);
+  });
+
+  // Path line
+  if (path.length > 1) {
+    ctx.beginPath();
+    ctx.strokeStyle = '#185fa5';
+    ctx.lineWidth = 2.5;
+    ctx.moveTo(cellCenter(path[0].x, path[0].y).x, cellCenter(path[0].x, path[0].y).y);
+    for (let i = 1; i < path.length; i++) {
+      const c = cellCenter(path[i].x, path[i].y);
+      ctx.lineTo(c.x, c.y);
+    }
+    ctx.stroke();
+
+    // Step numbers
+    ctx.fillStyle = '#185fa5';
+    ctx.font = 'bold 9px -apple-system, sans-serif';
+    ctx.textAlign = 'center';
+    for (let i = 1; i < path.length; i++) {
+      const c = cellCenter(path[i].x, path[i].y);
+      ctx.fillText(i, c.x, c.y - 16);
+    }
+  }
+
+  // Grid
+  ctx.strokeStyle = '#dddad0';
+  ctx.lineWidth = 0.5;
+  for (let x = 0; x <= COLS; x++) {
+    ctx.beginPath(); ctx.moveTo(x * CELL, 0); ctx.lineTo(x * CELL, ROWS * CELL); ctx.stroke();
+  }
+  for (let y = 0; y <= ROWS; y++) {
+    ctx.beginPath(); ctx.moveTo(0, y * CELL); ctx.lineTo(COLS * CELL, y * CELL); ctx.stroke();
+  }
+
+  // Axis labels
+  ctx.fillStyle = '#aaaaaa';
+  ctx.font = '9px -apple-system, sans-serif';
+  ctx.textAlign = 'center';
+  for (let x = 0; x < COLS; x++) {
+    ctx.fillText(x - CX, x * CELL + CELL / 2, ROWS * CELL + 14);
+  }
+  ctx.textAlign = 'right';
+  for (let y = 0; y < ROWS; y++) {
+    ctx.fillText(-(y - CY), COLS * CELL + 28, y * CELL + CELL / 2 + 4);
+  }
+
+  // Cell labels
+  for (const [key, name] of Object.entries(cellLabels)) {
+    const [lx, ly] = key.split(',').map(Number);
+    ctx.font = 'bold 9px -apple-system, sans-serif';
+    const tw = ctx.measureText(name).width;
+    ctx.fillStyle = '#faeeda';
+    ctx.fillRect(lx * CELL + 2, ly * CELL + 2, tw + 8, 16);
+    ctx.fillStyle = '#633806';
+    ctx.textAlign = 'left';
+    ctx.fillText(name, lx * CELL + 6, ly * CELL + 13);
+  }
+
+  // Origin
+  const oc = cellCenter(CX, CY);
+  ctx.beginPath();
+  ctx.arc(oc.x, oc.y, 11, 0, Math.PI * 2);
+  ctx.fillStyle = '#3b6d11';
+  ctx.fill();
+  ctx.font = '12px -apple-system, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillStyle = 'white';
+  ctx.fillText('⌂', oc.x, oc.y + 4);
+
+  // Current pos
+  const pc = cellCenter(pos.x, pos.y);
+  ctx.beginPath();
+  ctx.arc(pc.x, pc.y, 13, 0, Math.PI * 2);
+  ctx.fillStyle = '#d85a30';
+  ctx.fill();
+  ctx.font = '14px -apple-system, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillStyle = 'white';
+  ctx.fillText('★', pc.x, pc.y + 5);
+
+  // Compass
+  drawCompass(COLS * CELL - 36, 36);
+
+  updatePosInfo();
+}
+
+function drawCompass(cx, cy) {
+  ctx.beginPath();
+  ctx.arc(cx, cy, 24, 0, Math.PI * 2);
+  ctx.fillStyle = '#f0ede4';
+  ctx.fill();
+  ctx.strokeStyle = '#dddad0';
+  ctx.lineWidth = 0.5;
+  ctx.stroke();
+  const dirs = [['N',0,-1],['S',0,1],['O',-1,0],['E',1,0]];
+  dirs.forEach(([d, dx, dy]) => {
+    ctx.font = 'bold 11px -apple-system, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillStyle = d === 'N' ? '#d85a30' : '#888780';
+    ctx.fillText(d, cx + dx * 16, cy + dy * 16 + 4);
+  });
+}
+
+function updatePosInfo() {
+  const dx = pos.x - CX, dy = -(pos.y - CY);
+  document.getElementById('pos-info').textContent =
+    `(${dx >= 0 ? '+' : ''}${dx}, ${dy >= 0 ? '+' : ''}${dy})  •  ${history.length} pas`;
+}
+
+// ── TOUCH / CLICK ON MAP ──
+let longPressTimer = null;
+let touchMoved = false;
+
+canvas.addEventListener('touchstart', e => {
+  touchMoved = false;
+  const touch = e.touches[0];
+  const rect = canvas.getBoundingClientRect();
+  const x = Math.floor((touch.clientX - rect.left) / CELL);
+  const y = Math.floor((touch.clientY - rect.top) / CELL);
+  if (x < 0 || x >= COLS || y < 0 || y >= ROWS) return;
+  longPressTimer = setTimeout(() => {
+    if (!touchMoved) openLabelModal(x, y);
+  }, 500);
+}, { passive: true });
+
+canvas.addEventListener('touchmove', () => {
+  touchMoved = true;
+  clearTimeout(longPressTimer);
+}, { passive: true });
+
+canvas.addEventListener('touchend', e => {
+  clearTimeout(longPressTimer);
+  if (touchMoved) return;
+  const touch = e.changedTouches[0];
+  const rect = canvas.getBoundingClientRect();
+  const x = Math.floor((touch.clientX - rect.left) / CELL);
+  const y = Math.floor((touch.clientY - rect.top) / CELL);
+  if (x >= 0 && x < COLS && y >= 0 && y < ROWS) moveTo(x, y);
+}, { passive: true });
+
+canvas.addEventListener('click', e => {
+  const rect = canvas.getBoundingClientRect();
+  const x = Math.floor((e.clientX - rect.left) / CELL);
+  const y = Math.floor((e.clientY - rect.top) / CELL);
+  if (x >= 0 && x < COLS && y >= 0 && y < ROWS) moveTo(x, y);
+});
+
+// ── ACTIONS ──
+function moveTo(x, y) {
+  pos = {x, y};
+  path.push({...pos});
+  history.push(`(${x - CX}, ${-(y - CY)})`);
+  draw();
+  save();
+}
+
+function undo() {
+  if (path.length <= 1) return;
+  path.pop();
+  if (history.length) history.pop();
+  pos = {...path[path.length - 1]};
+  draw();
+  save();
+}
+
+function resetMap() {
+  if (!confirm('Remettre la carte à zéro ?')) return;
+  pos = {x: CX, y: CY};
+  path = [{x: CX, y: CY}];
+  history = [];
+  cellLabels = {};
+  draw();
+  save();
+}
+
+// ── DICE ──
+document.getElementById('dice1-btn').onclick = () => {
+  const r = Math.floor(Math.random() * 6);
+  document.getElementById('dice1-result').textContent = DICE_FACES[r];
+};
+document.getElementById('dice2-btn').onclick = () => {
+  const r1 = Math.floor(Math.random() * 6);
+  const r2 = Math.floor(Math.random() * 6);
+  document.getElementById('dice2-result').textContent =
+    `${DICE_FACES[r1]} ${DICE_FACES[r2]}  →  ${r1 + r2 + 2}`;
+};
+
+// ── LABEL MODAL ──
+let pendingLabelPos = null;
+
+function openLabelModal(x, y) {
+  pendingLabelPos = {x, y};
+  const key = `${x},${y}`;
+  const dx = x - CX, dy = -(y - CY);
+  document.getElementById('label-modal-title').textContent =
+    `Nommer la case (${dx >= 0 ? '+' : ''}${dx}, ${dy >= 0 ? '+' : ''}${dy})`;
+  document.getElementById('label-input').value = cellLabels[key] || '';
+  document.getElementById('label-delete-btn').style.display = cellLabels[key] ? '' : 'none';
+  document.getElementById('label-modal').classList.add('visible');
+  setTimeout(() => document.getElementById('label-input').focus(), 100);
+}
+
+document.getElementById('label-ok-btn').onclick = () => {
+  if (!pendingLabelPos) return;
+  const key = `${pendingLabelPos.x},${pendingLabelPos.y}`;
+  const name = document.getElementById('label-input').value.trim();
+  if (name) cellLabels[key] = name;
+  else delete cellLabels[key];
+  document.getElementById('label-modal').classList.remove('visible');
+  draw(); save();
+};
+document.getElementById('label-cancel-btn').onclick = () => {
+  document.getElementById('label-modal').classList.remove('visible');
+};
+document.getElementById('label-delete-btn').onclick = () => {
+  if (!pendingLabelPos) return;
+  delete cellLabels[`${pendingLabelPos.x},${pendingLabelPos.y}`];
+  document.getElementById('label-modal').classList.remove('visible');
+  draw(); save();
+};
+document.getElementById('label-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter') document.getElementById('label-ok-btn').click();
+  if (e.key === 'Escape') document.getElementById('label-cancel-btn').click();
+});
+
+// ── SIDEBAR ──
+document.getElementById('sidebar-toggle').onclick = () => {
+  sidebarVisible = !sidebarVisible;
+  document.getElementById('sidebar').classList.toggle('hidden', !sidebarVisible);
+};
+
+// ── NAV BUTTONS ──
+document.getElementById('undo-btn').onclick = undo;
+document.getElementById('reset-btn').onclick = resetMap;
+
+// ── AUTO-SAVE ON FIELD CHANGE ──
+FIELDS.forEach(id => {
+  const el = document.getElementById(id);
+  if (el) el.addEventListener('input', save);
+});
+
+// ── CAMPAIGNS ──
+function buildCampaignSelect() {
+  const sel = document.getElementById('campaign-select');
+  sel.innerHTML = '';
+  Object.keys(campaigns).sort().forEach(name => {
+    const opt = document.createElement('option');
+    opt.value = name; opt.textContent = name;
+    if (name === currentCampaign) opt.selected = true;
+    sel.appendChild(opt);
+  });
+}
+
+document.getElementById('campaign-select').onchange = e => {
+  switchCampaign(e.target.value);
+};
+
+document.getElementById('new-camp-btn').onclick = () => {
+  document.getElementById('camp-name-input').value = '';
+  document.getElementById('camp-modal').classList.add('visible');
+  setTimeout(() => document.getElementById('camp-name-input').focus(), 100);
+};
+document.getElementById('camp-ok-btn').onclick = () => {
+  const name = document.getElementById('camp-name-input').value.trim();
+  if (!name || campaigns[name]) return;
+  snapshotCurrent();
+  campaigns[name] = emptyState();
+  currentCampaign = name;
+  applyState(campaigns[name]);
+  buildCampaignSelect();
+  document.getElementById('camp-modal').classList.remove('visible');
+  save();
+};
+document.getElementById('camp-cancel-btn').onclick = () => {
+  document.getElementById('camp-modal').classList.remove('visible');
+};
+document.getElementById('camp-name-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter') document.getElementById('camp-ok-btn').click();
+});
+
+document.getElementById('del-camp-btn').onclick = () => {
+  if (Object.keys(campaigns).length <= 1) { alert('Impossible de supprimer la dernière campagne.'); return; }
+  if (!confirm(`Supprimer la campagne « ${currentCampaign} » ?`)) return;
+  delete campaigns[currentCampaign];
+  currentCampaign = Object.keys(campaigns).sort()[0];
+  applyState(campaigns[currentCampaign]);
+  buildCampaignSelect();
+  save();
+};
+
+function switchCampaign(name) {
+  snapshotCurrent();
+  currentCampaign = name;
+  if (!campaigns[name]) campaigns[name] = emptyState();
+  applyState(campaigns[name]);
+  save();
+}
+
+function emptyState() {
+  return {
+    pos: {x: CX, y: CY}, path: [{x: CX, y: CY}], history: [],
+    cellLabels: {}, chapter: '', habilite: '', endurance: '',
+    chance: '', or: '', equipement: '', tresor: '', provisions: '',
+    enemyEndurance: '', enemyHabilite: ''
+  };
+}
+
+function snapshotCurrent() {
+  campaigns[currentCampaign] = {
+    pos: {...pos}, path: path.map(p => ({...p})), history: [...history],
+    cellLabels: {...cellLabels},
+    chapter: document.getElementById('chapter').value,
+    habilite: document.getElementById('habilite').value,
+    endurance: document.getElementById('endurance').value,
+    chance: document.getElementById('chance').value,
+    or: document.getElementById('or').value,
+    equipement: document.getElementById('equipement').value,
+    tresor: document.getElementById('tresor').value,
+    provisions: document.getElementById('provisions').value,
+    enemyEndurance: document.getElementById('enemy-endurance').value,
+    enemyHabilite: document.getElementById('enemy-habilite').value,
+  };
+}
+
+function applyState(s) {
+  pos = s.pos ? {...s.pos} : {x: CX, y: CY};
+  path = s.path ? s.path.map(p => ({...p})) : [{x: CX, y: CY}];
+  history = s.history ? [...s.history] : [];
+  cellLabels = s.cellLabels ? {...s.cellLabels} : {};
+  document.getElementById('chapter').value = s.chapter || '';
+  document.getElementById('habilite').value = s.habilite || '';
+  document.getElementById('endurance').value = s.endurance || '';
+  document.getElementById('chance').value = s.chance || '';
+  document.getElementById('or').value = s.or || '';
+  document.getElementById('equipement').value = s.equipement || '';
+  document.getElementById('tresor').value = s.tresor || '';
+  document.getElementById('provisions').value = s.provisions || '';
+  document.getElementById('enemy-endurance').value = s.enemyEndurance || '';
+  document.getElementById('enemy-habilite').value = s.enemyHabilite || '';
+  draw();
+}
+
+// ── SAVE / LOAD ──
+function save() {
+  snapshotCurrent();
+  try {
+    localStorage.setItem('jdr_map', JSON.stringify({ currentCampaign, campaigns }));
+  } catch(e) {}
+}
+
+function load() {
+  try {
+    const raw = localStorage.getItem('jdr_map');
+    if (!raw) { campaigns = { 'Défaut': emptyState() }; return; }
+    const data = JSON.parse(raw);
+    campaigns = data.campaigns || { 'Défaut': emptyState() };
+    currentCampaign = data.currentCampaign || 'Défaut';
+    if (!campaigns[currentCampaign]) campaigns[currentCampaign] = emptyState();
+    applyState(campaigns[currentCampaign]);
+  } catch(e) {
+    campaigns = { 'Défaut': emptyState() };
+  }
+}
+
+// ── INIT ──
+load();
+buildCampaignSelect();
+resizeCanvas();
+window.addEventListener('resize', resizeCanvas);
+</script>
+
+  <script>
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('./sw.js');
+    }
+  </script>
+</body>
+</html>
