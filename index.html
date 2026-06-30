@@ -105,7 +105,9 @@
       touch-action: manipulation;
     }
     .dpad-btn:active { background: #e6f1fb; color: #185fa5; transform: scale(0.95); }
-    .dpad-center { width: 50px; height: 50px; }
+    .dpad-center { width: 50px; height: 50px; display: flex; }
+    .dpad-undo { background: #fbeaea; color: #a32d2d; border-color: #f0d6d6; }
+    .dpad-undo:active { background: #f5d4d4; color: #a32d2d; }
 
     .modal-box { opacity: 1 !important; }
 
@@ -255,7 +257,7 @@
       <button class="dpad-btn" data-dir="N">↑</button>
       <button class="dpad-btn" data-dir="NE">↗</button>
       <button class="dpad-btn" data-dir="O">←</button>
-      <div class="dpad-center"></div>
+      <div class="dpad-center"><button class="dpad-btn dpad-undo" id="dpad-undo-btn" title="Annuler">↩</button></div>
       <button class="dpad-btn" data-dir="E">→</button>
       <button class="dpad-btn" data-dir="SO">↙</button>
       <button class="dpad-btn" data-dir="S">↓</button>
@@ -535,9 +537,10 @@ function moveDirection(dir) {
   moveTo(nx, ny);
 }
 
-document.querySelectorAll('.dpad-btn').forEach(btn => {
+document.querySelectorAll('.dpad-btn[data-dir]').forEach(btn => {
   btn.addEventListener('click', () => moveDirection(btn.dataset.dir));
 });
+document.getElementById('dpad-undo-btn').addEventListener('click', () => undo());
 
 function undo() {
   if (path.length <= 1) return;
