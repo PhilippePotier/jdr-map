@@ -33,6 +33,20 @@
       color: #2c2c2a; flex: 1; max-width: 180px;
     }
     #topbar .pos-info { font-size: 12px; color: #888780; margin-left: auto; }
+    #export-menu {
+      display: none; position: absolute; top: 38px; right: 0;
+      background: white; border: 1px solid #dddad0; border-radius: 10px;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.12); z-index: 50;
+      min-width: 200px; overflow: hidden;
+    }
+    #export-menu.visible { display: block; }
+    #export-menu button {
+      display: block; width: 100%; text-align: left;
+      padding: 12px 16px; border: none; background: none;
+      font-size: 14px; color: #2c2c2a; cursor: pointer;
+    }
+    #export-menu button:active { background: #f0ede4; }
+    #export-menu button + button { border-top: 1px solid #eee; }
 
     /* ── MAIN LAYOUT ── */
     #main { display: flex; flex: 1; overflow: hidden; }
@@ -113,7 +127,15 @@
   <button class="btn btn-green" id="new-camp-btn" style="padding:4px 10px;font-size:12px;">+ Nouvelle</button>
   <button class="btn btn-red" id="del-camp-btn" style="padding:4px 10px;font-size:12px;">✕</button>
   <span class="pos-info" id="pos-info"></span>
+  <div style="position:relative;">
+    <button class="icon-btn" id="export-menu-toggle" title="Export / Import">⋮</button>
+    <div id="export-menu">
+      <button id="export-btn">⬇ Exporter la partie</button>
+      <button id="import-btn">⬆ Importer une partie</button>
+    </div>
+  </div>
 </div>
+<input type="file" id="import-file-input" accept="application/json" style="display:none;">
 
 <!-- MAIN -->
 <div id="main">
@@ -631,6 +653,63 @@ function load() {
     campaigns = { 'Défaut': emptyState() };
   }
 }
+
+// ── EXPORT MENU TOGGLE ──
+document.getElementById('export-menu-toggle').onclick = e => {
+  e.stopPropagation();
+  document.getElementById('export-menu').classList.toggle('visible');
+};
+document.addEventListener('click', () => {
+  document.getElementById('export-menu').classList.remove('visible');
+});
+
+// ── EXPORT ──
+document.getElementById('export-btn').onclick = () => {
+  snapshotCurrent();
+  const data = { currentCampaign, campaigns };
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  const dateStr = new Date().toISOString().slice(0, 10);
+  a.href = url;
+  a.download = `jdr-map-sauvegarde-${dateStr}.json`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+};
+
+// ── IMPORT ──
+document.getElementById('import-btn').onclick = () => {
+  document.getElementById('import-file-input').click();
+};
+document.getElementById('import-file-input').onchange = e => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    try {
+      const data = JSON.parse(ev.target.result);
+      if (!data.campaigns || typeof data.campaigns !== 'object') {
+        alert('Fichier invalide.');
+        return;
+      }
+      if (!confirm('Importer cette sauvegarde va remplacer toutes les campagnes actuelles. Continuer ?')) return;
+      campaigns = data.campaigns;
+      currentCampaign = data.currentCampaign && campaigns[data.currentCampaign]
+        ? data.currentCampaign
+        : Object.keys(campaigns)[0];
+      applyState(campaigns[currentCampaign]);
+      buildCampaignSelect();
+      save();
+      alert('Sauvegarde importée avec succès !');
+    } catch (err) {
+      alert('Erreur lors de la lecture du fichier.');
+    }
+  };
+  reader.readAsText(file);
+  e.target.value = '';
+};
 
 // ── INIT ──
 load();
