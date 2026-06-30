@@ -87,6 +87,8 @@
     #map-container { flex: 1; overflow: auto; position: relative; }
     #map-canvas { display: block; touch-action: none; }
 
+    .modal-box { opacity: 1 !important; }
+
     /* ── LABEL MODAL ── */
     #label-modal {
       display: none; position: fixed; inset: 0; z-index: 100;
@@ -124,7 +126,7 @@
       padding: 16px;
     }
     #export-modal.visible, #import-modal.visible { display: flex; }
-    .modal-box-wide { width: 480px; max-width: 100%; }
+    .modal-box-wide { width: 480px; max-width: 100%; background: #ffffff; opacity: 1; border-radius: 16px; padding: 24px; }
     .modal-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
     .modal-header h3 { font-size: 16px; }
     .modal-close { background: none; border: none; font-size: 18px; color: #888780; cursor: pointer; padding: 4px 8px; }
