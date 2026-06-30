@@ -116,6 +116,27 @@
     #camp-modal input { width: 100%; font-size: 15px; padding: 10px 12px; border: 1px solid #dddad0; border-radius: 8px; margin-bottom: 12px; }
     #camp-modal .modal-btns { display: flex; gap: 8px; justify-content: flex-end; }
     #camp-modal .modal-btns button { padding: 8px 18px; border-radius: 8px; border: none; font-size: 14px; font-weight: 600; cursor: pointer; }
+
+    /* ── EXPORT / IMPORT MODALS ── */
+    #export-modal, #import-modal {
+      display: none; position: fixed; inset: 0; z-index: 100;
+      background: rgba(0,0,0,0.4); align-items: center; justify-content: center;
+      padding: 16px;
+    }
+    #export-modal.visible, #import-modal.visible { display: flex; }
+    .modal-box-wide { width: 480px; max-width: 100%; }
+    .modal-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+    .modal-header h3 { font-size: 16px; }
+    .modal-close { background: none; border: none; font-size: 18px; color: #888780; cursor: pointer; padding: 4px 8px; }
+    .modal-close:active { color: #2c2c2a; }
+    .modal-hint { font-size: 12px; color: #888780; margin-bottom: 10px; line-height: 1.4; }
+    #export-textarea, #import-textarea {
+      width: 100%; height: 220px; font-family: ui-monospace, monospace;
+      font-size: 11px; border: 1px solid #dddad0; border-radius: 8px;
+      padding: 10px; resize: vertical; color: #2c2c2a; background: #faf8f3;
+      margin-bottom: 14px;
+    }
+    #export-copy-btn.copied { background: #2d6e2d !important; }
   </style>
 </head>
 <body>
@@ -135,7 +156,6 @@
     </div>
   </div>
 </div>
-<input type="file" id="import-file-input" accept="application/json" style="display:none;">
 
 <!-- MAIN -->
 <div id="main">
@@ -231,6 +251,37 @@
     <div class="modal-btns">
       <button class="btn-cancel" id="camp-cancel-btn" style="background:#f0ede4;color:#2c2c2a;">Annuler</button>
       <button class="btn-ok" id="camp-ok-btn" style="background:#185fa5;color:white;">Créer</button>
+    </div>
+  </div>
+</div>
+
+<!-- EXPORT MODAL -->
+<div id="export-modal">
+  <div class="modal-box modal-box-wide">
+    <div class="modal-header">
+      <h3>Exporter la partie</h3>
+      <button class="modal-close" id="export-modal-close">✕</button>
+    </div>
+    <p class="modal-hint">Copie ce texte et garde-le en lieu sûr (note, email...) pour pouvoir le réimporter plus tard.</p>
+    <textarea id="export-textarea" readonly></textarea>
+    <div class="modal-btns">
+      <button class="btn-ok" id="export-copy-btn" style="background:#185fa5;color:white;">📋 Copier le texte</button>
+    </div>
+  </div>
+</div>
+
+<!-- IMPORT MODAL -->
+<div id="import-modal">
+  <div class="modal-box modal-box-wide">
+    <div class="modal-header">
+      <h3>Importer une partie</h3>
+      <button class="modal-close" id="import-modal-close">✕</button>
+    </div>
+    <p class="modal-hint">Colle ici le texte d'une sauvegarde exportée précédemment.</p>
+    <textarea id="import-textarea" placeholder="Colle le texte JSON ici..."></textarea>
+    <div class="modal-btns">
+      <button class="btn-cancel" id="import-cancel-btn" style="background:#f0ede4;color:#2c2c2a;">Annuler</button>
+      <button class="btn-ok" id="import-confirm-btn" style="background:#185fa5;color:white;">Importer</button>
     </div>
   </div>
 </div>
@@ -663,52 +714,72 @@ document.addEventListener('click', () => {
   document.getElementById('export-menu').classList.remove('visible');
 });
 
-// ── EXPORT ──
+// ── EXPORT MODAL ──
 document.getElementById('export-btn').onclick = () => {
+  document.getElementById('export-menu').classList.remove('visible');
   snapshotCurrent();
   const data = { currentCampaign, campaigns };
-  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  const dateStr = new Date().toISOString().slice(0, 10);
-  a.href = url;
-  a.download = `jdr-map-sauvegarde-${dateStr}.json`;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
+  document.getElementById('export-textarea').value = JSON.stringify(data, null, 2);
+  document.getElementById('export-copy-btn').textContent = '📋 Copier le texte';
+  document.getElementById('export-copy-btn').classList.remove('copied');
+  document.getElementById('export-modal').classList.add('visible');
+};
+document.getElementById('export-modal-close').onclick = () => {
+  document.getElementById('export-modal').classList.remove('visible');
+};
+document.getElementById('export-copy-btn').onclick = () => {
+  const ta = document.getElementById('export-textarea');
+  ta.select();
+  ta.setSelectionRange(0, 999999);
+  try {
+    navigator.clipboard.writeText(ta.value).then(() => {
+      const btn = document.getElementById('export-copy-btn');
+      btn.textContent = '✓ Copié !';
+      btn.classList.add('copied');
+      setTimeout(() => {
+        btn.textContent = '📋 Copier le texte';
+        btn.classList.remove('copied');
+      }, 1500);
+    });
+  } catch(e) {
+    document.execCommand('copy');
+  }
 };
 
-// ── IMPORT ──
+// ── IMPORT MODAL ──
 document.getElementById('import-btn').onclick = () => {
-  document.getElementById('import-file-input').click();
+  document.getElementById('export-menu').classList.remove('visible');
+  document.getElementById('import-textarea').value = '';
+  document.getElementById('import-modal').classList.add('visible');
 };
-document.getElementById('import-file-input').onchange = e => {
-  const file = e.target.files[0];
-  if (!file) return;
-  const reader = new FileReader();
-  reader.onload = ev => {
-    try {
-      const data = JSON.parse(ev.target.result);
-      if (!data.campaigns || typeof data.campaigns !== 'object') {
-        alert('Fichier invalide.');
-        return;
-      }
-      if (!confirm('Importer cette sauvegarde va remplacer toutes les campagnes actuelles. Continuer ?')) return;
-      campaigns = data.campaigns;
-      currentCampaign = data.currentCampaign && campaigns[data.currentCampaign]
-        ? data.currentCampaign
-        : Object.keys(campaigns)[0];
-      applyState(campaigns[currentCampaign]);
-      buildCampaignSelect();
-      save();
-      alert('Sauvegarde importée avec succès !');
-    } catch (err) {
-      alert('Erreur lors de la lecture du fichier.');
+document.getElementById('import-modal-close').onclick = () => {
+  document.getElementById('import-modal').classList.remove('visible');
+};
+document.getElementById('import-cancel-btn').onclick = () => {
+  document.getElementById('import-modal').classList.remove('visible');
+};
+document.getElementById('import-confirm-btn').onclick = () => {
+  const raw = document.getElementById('import-textarea').value.trim();
+  if (!raw) { alert('Colle d\'abord le texte de la sauvegarde.'); return; }
+  try {
+    const data = JSON.parse(raw);
+    if (!data.campaigns || typeof data.campaigns !== 'object') {
+      alert('Texte invalide : ce n\'est pas une sauvegarde JDR Map.');
+      return;
     }
-  };
-  reader.readAsText(file);
-  e.target.value = '';
+    if (!confirm('Importer cette sauvegarde va remplacer toutes les campagnes actuelles. Continuer ?')) return;
+    campaigns = data.campaigns;
+    currentCampaign = data.currentCampaign && campaigns[data.currentCampaign]
+      ? data.currentCampaign
+      : Object.keys(campaigns)[0];
+    applyState(campaigns[currentCampaign]);
+    buildCampaignSelect();
+    save();
+    document.getElementById('import-modal').classList.remove('visible');
+    alert('Sauvegarde importée avec succès !');
+  } catch (err) {
+    alert('Texte invalide : impossible de lire ce JSON.');
+  }
 };
 
 // ── INIT ──
